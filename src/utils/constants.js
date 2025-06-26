@@ -1,4 +1,4 @@
-export const CONTRACT_ADDRESS = "0xd162b79a8D70B90407a8a6f165FB3D58BFBDcF95";
+export const CONTRACT_ADDRESS = "0xbDeCc6C346D2Cd77BCeB4f404ABF7C3e76D8C24f";
 
 export const ABI = [
 	{
@@ -774,6 +774,6 @@ export const MONAD_TESTNET = {
     blockExplorerUrls: ["https://testnet.monadexplorer.com"] 
 };
 
-export const EMOJIS = ['😭', '😂', '❤️', '🔥', '🤣', '✨', '🙏', '😍', '🥺', '😘', '😊', '😃', '😄', '😁', '👍', '😅', '😉', '🤔', '😎', '😏', '😢', '🤗', '🤩', '🤐', '😜', '😇', '🤫', '🤭', '🤓', '😌'];
+export const EMOJIS = ['😭', '👀' ,'😂', '❤️', '🔥', '🤣', '✨', '🙏', '😍', '🥺', '😘', '😊', '😃', '😄', '😁', '👍', '😅', '😉', '🤔', '😎', '😏', '😢', '🤗', '🤩', '🤐', '😜', '😇', '🤫', '🤭', '🤓', '😌'];
 
 export const userProfilesCache = new Map();
