@@ -55,6 +55,7 @@ export default function ChatApp() {
     const [isAppLoading, setIsAppLoading] = useState(true);
     const [showGifPicker, setShowGifPicker] = useState(false);
     const [selectedGifUrl, setSelectedGifUrl] = useState(null);
+    const [isWrongNetwork, setIsWrongNetwork] = useState(false);
 
     const messagesContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -85,6 +86,7 @@ export default function ChatApp() {
                 const file = items[i].getAsFile();
                 
                 setSelectedImage(file);
+                setSelectedGifUrl(null);
                 showPopup('Imagem colada da área de transferência!', 'success');
                 break; 
             }
@@ -329,6 +331,7 @@ export default function ChatApp() {
 
     const handleSelectGif = (gifUrl) => {
         setSelectedGifUrl(gifUrl); 
+        setSelectedImage(null);
         setShowGifPicker(false);   
     };
 
@@ -424,13 +427,16 @@ export default function ChatApp() {
                 showPopup('Nenhuma conta selecionada', 'error');
                 return;
             }
+
             
             try {
                 await walletProvider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: MONAD_TESTNET.chainId }] });
             } catch (switchError) {
+                
                 if (switchError.code === 4902) {
                     await walletProvider.request({ method: 'wallet_addEthereumChain', params: [MONAD_TESTNET] });
                 } else {
+                    
                     hidePopup();
                     showPopup('Por favor, mude para a rede Monad Testnet em sua carteira.', 'warning');
                     return;
@@ -442,12 +448,12 @@ export default function ChatApp() {
             const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
             const userAddress = accounts[0];
 
-            
+            setIsWrongNetwork(false); 
             setProvider(provider);
             setSigner(signer);
             setContract(contract);
             setAccount(userAddress);
-           
+        
             const [profileData, balanceData, ownerAddress, isModeratorResult] = await Promise.all([
                 contract.obterPerfilUsuario(userAddress),
                 provider.getBalance(userAddress),
@@ -460,7 +466,6 @@ export default function ChatApp() {
 
             if (!profileExists) {
                 hidePopup();
-                
                 setUserProfile({ exists: false, username: '', profilePicHash: '', role: 0 });
                 setIsOwner(false);
                 setIsModerator(false);
@@ -468,29 +473,19 @@ export default function ChatApp() {
                 setIsForcedAboutModal(true);
                 setShowAboutModal(true);
             } else {
-
                 const isOwnerResult = ownerAddress.toLowerCase() === userAddress.toLowerCase();
                 const finalIsModerator = isOwnerResult || isModeratorResult; 
                 const userRole = await contract.obterRoleUsuario(userAddress);
-
-                const userProfile = {
-                    username: profileData.username,
-                    profilePicHash: profileData.profilePicHash,
-                    exists: true,
-                    role: Number(userRole)
-                };
-                
+                const userProfile = { username: profileData.username, profilePicHash: profileData.profilePicHash, exists: true, role: Number(userRole) };
                 setUserProfile(userProfile);
                 userProfilesCache.set(userAddress.toLowerCase(), userProfile);
                 setIsOwner(isOwnerResult);
                 setIsModerator(finalIsModerator);
                 setBalance(ethers.formatEther(balanceData));
-                
                 hidePopup();
                 showPopup('Carteira conectada!', 'success');
             }
 
-            
             if (messages.length === 0) {
                 await loadMessages(contract);
             }
@@ -500,7 +495,6 @@ export default function ChatApp() {
             hidePopup();
             const friendlyMessage = getFriendlyErrorMessage(error);
             showPopup(`Erro: ${friendlyMessage}`, 'error');
-            
             disconnectWallet();
         }
     };
@@ -518,6 +512,7 @@ export default function ChatApp() {
         setShowDropdown(false);
         setIsOwner(false);
         setIsModerator(false);
+        setIsWrongNetwork(false);
         setIsInitialLoad(true);
         setMessages([]);
         setTimeout(async () => {
@@ -683,7 +678,7 @@ export default function ChatApp() {
     const handleProfileClick = async (userAddress) => { try { let profile = userProfilesCache.get(userAddress.toLowerCase()); if (!profile && userAddress !== CONTRACT_ADDRESS) { const profileData = await contract.obterPerfilUsuario(userAddress); if (profileData.exists) { profile = { username: profileData.username, profilePicHash: profileData.profilePicHash, exists: profileData.exists }; userProfilesCache.set(userAddress.toLowerCase(), profile); } } setSelectedUserAddress(userAddress); setSelectedUserProfile(profile); setShowProfileModal(true); } catch (error) { console.error('Erro ao carregar perfil:', error); } };
     const handleReply = (message) => { setEditingMessage(null); setReplyingTo(message); document.querySelector('textarea')?.focus(); };
     const handleEdit = (message) => { setReplyingTo(null); setEditingMessage(message); setNewMessage(message.conteudo); document.querySelector('textarea')?.focus(); };
-    const handleImageSelect = (event) => { const file = event.target.files[0]; if (file) { if (file.size > 10 * 1024 * 1024) { showPopup('Arquivo muito grande. Máximo 10MB.', 'error'); return; } setSelectedImage(file); } };
+    const handleImageSelect = (event) => { const file = event.target.files[0]; if (file) { if (file.size > 10 * 1024 * 1024) { showPopup('Arquivo muito grande. Máximo 10MB.', 'error'); return; } setSelectedImage(file); setSelectedGifUrl(null); } };
     const handleEmojiSelect = (emoji) => { setNewMessage(prev => prev + emoji); setShowEmojiPicker(false); };
     const handleKeyPress = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (editingMessage) { editMessage(editingMessage.id, newMessage); } else { sendMessage(); } } };
     const openModerationModal = (action) => { setModerationAction(action); setShowModerationModal(true); setShowDropdown(false); };
@@ -767,35 +762,52 @@ export default function ChatApp() {
         }
     }, [messages]);
     
-    useEffect(() => {
-        const walletProvider = window.ethereum;
-        if (walletProvider) {
-            const handleAccountsChanged = async (accounts) => {
-                if (accounts.length === 0) {
-                    showPopup("Carteira desconectada.", "warning");
-                    disconnectWallet();
-                } else {
-                    await initiateConnection(walletProvider, 'MetaMask');
-                }
-            };
-            const handleChainChanged = (chainId) => {
-                if (chainId !== MONAD_TESTNET.chainId) {
-                    showPopup("Rede incorreta. Por favor, volte para a Monad Testnet.", 'error', true); 
-                    disconnectWallet();
-                } else {
-                    initiateConnection(walletProvider, 'MetaMask');
-                }
-            };
-            walletProvider.on('accountsChanged', handleAccountsChanged);
-            walletProvider.on('chainChanged', handleChainChanged);
-            return () => {
-                if (walletProvider.removeListener) {
-                    walletProvider.removeListener('accountsChanged', handleAccountsChanged);
-                    walletProvider.removeListener('chainChanged', handleChainChanged);
-                }
-            };
+    
+useEffect(() => {
+   
+    if (!isConnected || !provider) {
+        return;
+    }
+
+    
+    const web3Provider = provider.provider;
+    const handleAccountsChanged = (accounts) => {
+        if (accounts.length === 0) {
+            showPopup("Carteira desconectada.", "warning");
+            disconnectWallet();
+        } else {
+            initiateConnection(web3Provider, 'Carteira');
         }
-    }, []); 
+    };
+    if (web3Provider && web3Provider.on) {
+        web3Provider.on('accountsChanged', handleAccountsChanged);
+    }
+
+    const checkNetwork = async () => {
+        try {
+            const network = await provider.getNetwork();
+            const onCorrectNetwork = network.chainId === BigInt(MONAD_TESTNET.chainId);
+            
+            setIsWrongNetwork(!onCorrectNetwork);
+        } catch (error) {
+            console.error("Erro ao verificar a rede durante o polling:", error);
+            
+            setIsWrongNetwork(true);
+        }
+    };
+
+    checkNetwork(); 
+
+    const networkInterval = setInterval(checkNetwork, 3000);
+
+    return () => {
+        clearInterval(networkInterval);
+        if (web3Provider && web3Provider.removeListener) {
+            web3Provider.removeListener('accountsChanged', handleAccountsChanged);
+        }
+    };
+
+}, [isConnected, provider]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -989,21 +1001,27 @@ export default function ChatApp() {
             </div>
 
             <footer className="footer-fixed p-4">
-                {isConnected ? (
+                
+                {isWrongNetwork && isConnected ? (
+                    <div className="text-center p-4 bg-red-900/50 border-t-2 border-red-500 rounded-t-lg animate-pulse">
+                        <h3 className="font-bold text-lg text-red-300"><i className="fas fa-exclamation-triangle mr-2"></i>REDE INCORRETA</h3>
+                        <p className="text-red-200 mt-1">Por favor, mude sua carteira de volta para a <strong>MONAD TESTNET</strong> para continuar. NÃO TENTE FAZER INTERAÇÕES ATÉ A REDE SER ALTERADA.</p>
+                    </div>
+                ) : isConnected ? (
+                    
                     <>
-                        {replyingTo && (<div className="reply-indicator"><i className="fas fa-reply mr-2"></i>Respondendo a {replyingTo.usuario}: {replyingTo.isImage ? 'Img ' : replyingTo.conteudo.substring(0, 50)}...<button onClick={() => setReplyingTo(null)} className="ml-2 text-red-400 hover:text-red-300"><i className="fas fa-times"></i></button></div>)}
+                        
+                        {replyingTo && (<div className="reply-indicator"><i className="fas fa-reply mr-2"></i>Respondendo a {replyingTo.usuario}: {replyingTo.conteudo.substring(0, 50)}...<button onClick={() => setReplyingTo(null)} className="ml-2 text-red-400 hover:text-red-300"><i className="fas fa-times"></i></button></div>)}
                         {editingMessage && (<div className="reply-indicator"><i className="fas fa-edit mr-2"></i>Editando mensagem<button onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="ml-2 text-red-400 hover:text-red-300"><i className="fas fa-times"></i></button></div>)}
 
-                       
+                        
                         <div className="flex items-end gap-2 mb-2">
-                           
                             {selectedImage && (
                                 <div className="relative">
                                     <img src={URL.createObjectURL(selectedImage)} alt="Prévia" className="max-h-24 rounded-md border border-gray-600"/>
                                     <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs focus:outline-none hover:bg-red-700">&times;</button>
                                 </div>
                             )}
-                            
                             {selectedGifUrl && (
                                 <div className="relative">
                                     <img src={selectedGifUrl} alt="Prévia do GIF" className="max-h-24 rounded-md border border-gray-600"/>
@@ -1012,8 +1030,10 @@ export default function ChatApp() {
                             )}
                         </div>
 
+                        
                         {uploading && (<div className="upload-progress"><p className="text-sm mb-2">Fazendo upload da imagem...</p><div className="progress-bar"><div className="progress-fill" style={{ width: `${uploadProgress}%` }}></div></div></div>)}
 
+                        
                         {userProfile?.exists ? (
                             <div className="flex items-center gap-2">
                                 <div className="emoji-picker-container relative">
@@ -1027,34 +1047,14 @@ export default function ChatApp() {
                                     )}
                                 </div>
                                 <div className="gif-picker-container relative">
-                                    <button onClick={() => setShowGifPicker(!showGifPicker)} className="btn btn-icon btn-secondary">
-                                        GIF
-                                    </button>
-                                    <GifPicker
-                                        isOpen={showGifPicker}
-                                        onClose={() => setShowGifPicker(false)}
-                                        onSelectGif={handleSelectGif}
-                                    />
+                                    <button onClick={() => setShowGifPicker(!showGifPicker)} className="btn btn-icon btn-secondary">GIF</button>
+                                    <GifPicker isOpen={showGifPicker} onClose={() => setShowGifPicker(false)} onSelectGif={handleSelectGif}/>
                                 </div>
                                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-icon btn-secondary"><i className="fas fa-image"></i></button>
                                 <div className="flex-1">
-                                    <textarea 
-                                        ref={textareaRef} 
-                                        value={newMessage} 
-                                        onChange={(e) => setNewMessage(e.target.value)} 
-                                        onKeyPress={handleKeyPress} 
-                                        placeholder={editingMessage ? "Editar mensagem..." : "Digite sua mensagem..."} 
-                                        className="input-field resize-none" 
-                                        rows="2" 
-                                        maxLength={280} 
-                                        disabled={uploading} 
-                                    />
+                                    <textarea ref={textareaRef} value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={handleKeyPress} placeholder={editingMessage ? "Editar mensagem..." : "Digite sua mensagem..."} className="input-field resize-none" rows="2" maxLength={280} disabled={uploading} />
                                 </div>
-                                <button 
-                                    onClick={editingMessage ? () => editMessage(editingMessage.id, newMessage) : sendMessage} 
-                                    className="btn btn-primary" 
-                                    disabled={(!newMessage.trim() && !selectedImage && !selectedGifUrl) || uploading}> 
-                                    
+                                <button onClick={editingMessage ? () => editMessage(editingMessage.id, newMessage) : sendMessage} className="btn btn-primary" disabled={(!newMessage.trim() && !selectedImage && !selectedGifUrl) || uploading}>
                                     {uploading ? (<div className="loading-spinner"></div>) : editingMessage ? (<i className="fas fa-save"></i>) : (<i className="fas fa-paper-plane"></i>)}
                                 </button>
                                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="file-input" />
@@ -1067,11 +1067,12 @@ export default function ChatApp() {
                         )}
                     </>
                 ) : (
+                    
                     <div className="text-center">
                         <p className="text-gray-300 mb-4"><i className="fas fa-eye mr-2"></i>Você está no modo somente leitura. Conecte sua carteira para participar do chat.</p>
                         <button onClick={() => setShowWalletConnectModal(true)} className="btn btn-primary" disabled={isInitialLoad}>
-                                    {isInitialLoad ? (<div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>) : (<i className="fas fa-wallet"></i>)}
-                                    {isInitialLoad ? 'Carregando...' : 'Conectar Carteira'}
+                            {isInitialLoad ? (<div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>) : (<i className="fas fa-wallet"></i>)}
+                            {isInitialLoad ? 'Carregando...' : 'Conectar Carteira'}
                         </button>
                     </div>
                 )}
@@ -1104,3 +1105,4 @@ export default function ChatApp() {
         </div>
     );
 }
+
