@@ -627,7 +627,7 @@ export default function ChatApp() {
         }
     };
 
-    const editMessage = async (messageId, newContent) => { try { showPopup('Editando mensagem...', 'info', true); const tx = await contract.editarMensagem(messageId, newContent); await tx.wait(); hidePopup(); showPopup('Mensagem editada!', 'success'); setEditingMessage(null); await loadMessages(contract); } catch (error) {
+    const editMessage = async (messageId, newContent) => { try { showPopup('Editando mensagem...', 'info', true); const tx = await contract.editarMensagem(messageId, newContent); await tx.wait(); hidePopup(); showPopup('Mensagem editada!', 'success'); setEditingMessage(null); setNewMessage(''); await loadMessages(contract); } catch (error) {
         hidePopup(); 
         const friendlyMessage = getFriendlyErrorMessage(error); 
         showPopup(friendlyMessage, 'error'); 
