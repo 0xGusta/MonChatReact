@@ -67,8 +67,6 @@ export default function ChatApp() {
     const lastMessageCountRef = useRef(0);
 
     const handlePaste = (event) => {
-        
-        console.log("PASTE DEBUG: Evento 'paste' detectado!");
 
         const items = event.clipboardData.items;
         if (!items) {
