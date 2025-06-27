@@ -60,7 +60,7 @@ export default function GifPicker({ isOpen, onClose, onSelectGif }) {
     if (!isOpen) return null;
 
     return (
-        <div className="emoji-picker" ref={pickerRef}>
+        <div className="emoji-picker overflow-y-auto pr-2 styled-scrollbar" ref={pickerRef}>
             <input
                 type="text"
                 value={searchTerm}
@@ -73,7 +73,7 @@ export default function GifPicker({ isOpen, onClose, onSelectGif }) {
                     <div className="loading-spinner"></div>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2 styled-scrollbar">
+                <div className="grid grid-cols-2 gap-2 max-h-[200px]">
                     {gifs.map((gif) => (
                         <div key={gif.id} className="cursor-pointer" onClick={() => onSelectGif(gif.media_formats.gif.url)}>
                             <img src={gif.media_formats.tinygif.url} alt={gif.content_description} className="w-full h-full object-cover rounded-md" />
