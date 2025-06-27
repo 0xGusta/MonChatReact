@@ -589,7 +589,7 @@ export default function ChatApp() {
         if (!newMessage.trim() && !selectedImage && !selectedGifUrl) return;
 
         showPopup('Enviando mensagem...', 'info', true);
-        setUploading(true);
+        
 
         try {
             const textContent = newMessage.trim();
@@ -597,7 +597,7 @@ export default function ChatApp() {
             const replyId = replyingTo ? replyingTo.id : 0;
 
             if (selectedImage) {
-                
+                setUploading(true);
                 imageHashContent = await uploadToIPFS(selectedImage, setUploadProgress);
             } else if (selectedGifUrl) {
                 
