@@ -61,11 +61,35 @@ export default function ChatApp() {
     const pollingIntervalRef = useRef(null);
     const emojiButtonRef = useRef(null);
     const scrollAnchorRef = useRef(null);
+    const textareaRef = useRef(null);
     const isFetchingNewerMessages = useRef(false);
     const hasAttemptedAutoConnect = useRef(false);
     const lastMessageCountRef = useRef(0);
 
-    
+    const handlePaste = (event) => {
+        
+        console.log("PASTE DEBUG: Evento 'paste' detectado!");
+
+        const items = event.clipboardData.items;
+        if (!items) {
+            
+            return;
+        }
+
+        for (let i = 0; i < items.length; i++) {
+            
+            if (items[i].type.indexOf('image') !== -1) {
+
+                event.preventDefault();
+
+                const file = items[i].getAsFile();
+                
+                setSelectedImage(file);
+                showPopup('Imagem colada da área de transferência!', 'success');
+                break; 
+            }
+        }
+    };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -335,6 +359,19 @@ export default function ChatApp() {
 
         showPopup(`${walletInfo.name} não está instalado.`, 'error');
     };
+
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.addEventListener('paste', handlePaste);
+        }
+    
+            return () => {
+            if (textarea) {
+                textarea.removeEventListener('paste', handlePaste);
+            }
+        };
+    }, [userProfile]);
 
     useEffect(() => {
         if (!popup) return;
@@ -941,7 +978,19 @@ export default function ChatApp() {
                                     )}
                                 </div>
                                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-icon btn-secondary"><i className="fas fa-image"></i></button>
-                                <div className="flex-1"><textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyPress={handleKeyPress} placeholder={editingMessage ? "Editar mensagem..." : "Digite sua mensagem..."} className="input-field resize-none" rows="2" maxLength={280} disabled={uploading} /></div>
+                                <div className="flex-1">
+                                    <textarea 
+                                        ref={textareaRef} 
+                                        value={newMessage} 
+                                        onChange={(e) => setNewMessage(e.target.value)} 
+                                        onKeyPress={handleKeyPress} 
+                                        placeholder={editingMessage ? "Editar mensagem..." : "Digite sua mensagem..."} 
+                                        className="input-field resize-none" 
+                                        rows="2" 
+                                        maxLength={280} 
+                                        disabled={uploading} 
+                                    />
+                                </div>
                                 <button onClick={editingMessage ? () => editMessage(editingMessage.id, newMessage) : sendMessage} className="btn btn-primary" disabled={(!newMessage.trim() && !selectedImage) || uploading}>
                                     {uploading ? (<div className="loading-spinner"></div>) : editingMessage ? (<i className="fas fa-save"></i>) : (<i className="fas fa-paper-plane"></i>)}
                                 </button>
