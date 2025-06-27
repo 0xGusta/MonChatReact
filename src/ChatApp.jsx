@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { ethers } from 'ethers';
 
-// Importações de Componentes
 import Popup from './components/Popup';
 import AboutModal from './components/AboutModal';
 import WalletConnectModal from './components/WalletConnectModal';
@@ -10,7 +9,6 @@ import EditProfileModal from './components/EditProfileModal';
 import SendMONModal from './components/SendMONModal';
 import ModerationModal from './components/ModerationModal';
 
-// Importações de Utilitários
 import { CONTRACT_ADDRESS, ABI, MONAD_TESTNET, EMOJIS, userProfilesCache } from './utils/constants';
 import { getWalletInfoFromProvider, SUPPORTED_WALLETS, generateDeeplink } from './utils/wallet';
 import { uploadToIPFS, getIPFSUrl } from './utils/ipfs';
@@ -583,11 +581,26 @@ export default function ChatApp() {
         const friendlyMessage = getFriendlyErrorMessage(error); 
         showPopup(friendlyMessage, 'error'); 
     } };
-    const registerUser = async (username, profilePicHash = '') => { try { showPopup('Registrando usuário...', 'info', true); const tx = await contract.registrarUsuario(username, profilePicHash); await tx.wait(); hidePopup(); showPopup('Usuário registrado com sucesso!', 'success'); await loadUserProfile(contract, account); } catch (error) {
-        hidePopup();
-        const friendlyMessage = getFriendlyErrorMessage(error); 
-        showPopup(friendlyMessage, 'error'); 
-    } };
+    const registerUser = async (username, profilePicHash = '') => { 
+        try { 
+            showPopup('Registrando usuário...', 'info', true); 
+            const tx = await contract.registrarUsuario(username, profilePicHash); 
+            await tx.wait(); 
+            hidePopup(); 
+            showPopup('Usuário registrado com sucesso!', 'success'); 
+            await loadUserProfile(contract, account); 
+
+            if (provider && account) {
+                const newBalance = await provider.getBalance(account);
+                setBalance(ethers.formatEther(newBalance));
+            }
+
+        } catch (error) {
+            hidePopup();
+            const friendlyMessage = getFriendlyErrorMessage(error); 
+            showPopup(friendlyMessage, 'error'); 
+        } 
+    };
     const updateProfile = async (username, profilePicHash) => { try { showPopup('Atualizando perfil...', 'info', true); const tx = await contract.atualizarPerfil(username, profilePicHash); await tx.wait(); hidePopup(); showPopup('Perfil atualizado!', 'success'); await loadUserProfile(contract, account); } catch (error) {
         hidePopup();
         const friendlyMessage = getFriendlyErrorMessage(error); 
@@ -920,7 +933,7 @@ export default function ChatApp() {
                                 <div className="emoji-picker-container relative">
                                     <button ref={emojiButtonRef} onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="btn btn-icon btn-secondary"><i className="fas fa-smile"></i></button>
                                     {showEmojiPicker && (
-                                        <div className="emoji-picker" ref={emojiPickerRef}>
+                                        <div className="emoji-picker overflow-y-auto pr-2 styled-scrollbar" ref={emojiPickerRef}>
                                             <div className="emoji-grid">
                                                 {EMOJIS.map((emoji, index) => (<div key={index} className="emoji-item" onClick={(e) => { e.stopPropagation(); handleEmojiSelect(emoji); }}>{emoji}</div>))}
                                             </div>
