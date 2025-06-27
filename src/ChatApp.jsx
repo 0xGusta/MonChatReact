@@ -8,6 +8,7 @@ import ProfileModal from './components/ProfileModal';
 import EditProfileModal from './components/EditProfileModal';
 import SendMONModal from './components/SendMONModal';
 import ModerationModal from './components/ModerationModal';
+import GifPicker from './components/GifPicker';
 
 import { CONTRACT_ADDRESS, ABI, MONAD_TESTNET, EMOJIS, userProfilesCache } from './utils/constants';
 import { getWalletInfoFromProvider, SUPPORTED_WALLETS, generateDeeplink } from './utils/wallet';
@@ -52,7 +53,8 @@ export default function ChatApp() {
     const [showWalletConnectModal, setShowWalletConnectModal] = useState(false);
     const [availableWallets, setAvailableWallets] = useState([]);
     const [isAppLoading, setIsAppLoading] = useState(true);
-
+    const [showGifPicker, setShowGifPicker] = useState(false);
+    const [selectedGifUrl, setSelectedGifUrl] = useState(null);
 
     const messagesContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -325,6 +327,11 @@ export default function ChatApp() {
         }
     };
 
+    const handleSelectGif = (gifUrl) => {
+        setSelectedGifUrl(gifUrl); 
+        setShowGifPicker(false);   
+    };
+
     const handleScroll = (e) => {
         const { scrollTop, scrollHeight, clientHeight } = e.target;
         const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 10;
@@ -578,24 +585,38 @@ export default function ChatApp() {
     };
     
     const sendMessage = async () => {
-        if (!newMessage.trim() && !selectedImage) return;
+        
+        if (!newMessage.trim() && !selectedImage && !selectedGifUrl) return;
+
+        showPopup('Enviando mensagem...', 'info', true);
+        setUploading(true);
+
         try {
-            showPopup('Enviando mensagem...', 'info', true);
-            let textContent = newMessage.trim();
+            const textContent = newMessage.trim();
             let imageHashContent = ''; 
-            if (selectedImage) {
-                setUploading(true);
-                imageHashContent = await uploadToIPFS(selectedImage, setUploadProgress);
-            }
             const replyId = replyingTo ? replyingTo.id : 0;
+
+            if (selectedImage) {
+                
+                imageHashContent = await uploadToIPFS(selectedImage, setUploadProgress);
+            } else if (selectedGifUrl) {
+                
+                imageHashContent = selectedGifUrl;
+            }
+
             const tx = await contract.enviarMensagem(textContent, imageHashContent, replyId);
             await tx.wait();
+
             setNewMessage('');
-            setSelectedImage(null); 
+            setSelectedImage(null);
+            setSelectedGifUrl(null);
             setReplyingTo(null);
+            setEditingMessage(null);
+
             hidePopup();
             showPopup('Mensagem enviada!', 'success');
-            setTimeout(() => loadNewerMessages(contract), 500); 
+            setTimeout(() => loadNewerMessages(contract), 500);
+
         } catch (error) {
             hidePopup();
             const friendlyMessage = getFriendlyErrorMessage(error);
@@ -603,7 +624,7 @@ export default function ChatApp() {
         } finally {
             setUploading(false);
             setUploadProgress(0);
-        } 
+        }
     };
 
     const editMessage = async (messageId, newContent) => { try { showPopup('Editando mensagem...', 'info', true); const tx = await contract.editarMensagem(messageId, newContent); await tx.wait(); hidePopup(); showPopup('Mensagem editada!', 'success'); setEditingMessage(null); await loadMessages(contract); } catch (error) {
@@ -929,8 +950,18 @@ export default function ChatApp() {
                                             )
                                         )}
                                         
-                                        {message.conteudo && <div dangerouslySetInnerHTML={{ __html: linkifyText(message.conteudo) }}></div>}
-                                        {message.imageHash && <img src={getIPFSUrl(message.imageHash)} alt="Imagem compartilhada" className="image-preview mt-2" onClick={() => showLinkConfirmation(getIPFSUrl(message.imageHash))} />}
+                                        {message.conteudo && (
+                                            <div dangerouslySetInnerHTML={{ __html: linkifyText(message.conteudo) }}></div>
+                                        )}
+
+                                        {message.imageHash && (
+                                            <img 
+                                                src={message.imageHash.startsWith('http') ? message.imageHash : getIPFSUrl(message.imageHash)} 
+                                                alt="Anexo" 
+                                                className="image-preview mt-2" 
+                                                onClick={() => showLinkConfirmation(message.imageHash.startsWith('http') ? message.imageHash : getIPFSUrl(message.imageHash))}
+                                            />
+                                        )}
                                       
                                         {isOwn && isConnected && (
                                             <div className="flex items-center gap-2 mt-2 text-xs">
@@ -956,13 +987,33 @@ export default function ChatApp() {
                     </div>
                 )}
             </div>
+
             <footer className="footer-fixed p-4">
                 {isConnected ? (
                     <>
                         {replyingTo && (<div className="reply-indicator"><i className="fas fa-reply mr-2"></i>Respondendo a {replyingTo.usuario}: {replyingTo.isImage ? 'Img ' : replyingTo.conteudo.substring(0, 50)}...<button onClick={() => setReplyingTo(null)} className="ml-2 text-red-400 hover:text-red-300"><i className="fas fa-times"></i></button></div>)}
                         {editingMessage && (<div className="reply-indicator"><i className="fas fa-edit mr-2"></i>Editando mensagem<button onClick={() => { setEditingMessage(null); setNewMessage(''); }} className="ml-2 text-red-400 hover:text-red-300"><i className="fas fa-times"></i></button></div>)}
-                        {selectedImage && (<div className="upload-progress"><p className="text-sm mb-2">Imagem selecionada: {selectedImage.name}</p><button onClick={() => setSelectedImage(null)} className="btn btn-secondary btn-sm"><i className="fas fa-times"></i> Remover</button></div>)}
+
+                       
+                        <div className="flex items-end gap-2 mb-2">
+                           
+                            {selectedImage && (
+                                <div className="relative">
+                                    <img src={URL.createObjectURL(selectedImage)} alt="Prévia" className="max-h-24 rounded-md border border-gray-600"/>
+                                    <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs focus:outline-none hover:bg-red-700">&times;</button>
+                                </div>
+                            )}
+                            
+                            {selectedGifUrl && (
+                                <div className="relative">
+                                    <img src={selectedGifUrl} alt="Prévia do GIF" className="max-h-24 rounded-md border border-gray-600"/>
+                                    <button onClick={() => setSelectedGifUrl(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs focus:outline-none hover:bg-red-700">&times;</button>
+                                </div>
+                            )}
+                        </div>
+
                         {uploading && (<div className="upload-progress"><p className="text-sm mb-2">Fazendo upload da imagem...</p><div className="progress-bar"><div className="progress-fill" style={{ width: `${uploadProgress}%` }}></div></div></div>)}
+
                         {userProfile?.exists ? (
                             <div className="flex items-center gap-2">
                                 <div className="emoji-picker-container relative">
@@ -974,6 +1025,16 @@ export default function ChatApp() {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                                <div className="gif-picker-container relative">
+                                    <button onClick={() => setShowGifPicker(!showGifPicker)} className="btn btn-icon btn-secondary">
+                                        GIF
+                                    </button>
+                                    <GifPicker
+                                        isOpen={showGifPicker}
+                                        onClose={() => setShowGifPicker(false)}
+                                        onSelectGif={handleSelectGif}
+                                    />
                                 </div>
                                 <button onClick={() => fileInputRef.current?.click()} className="btn btn-icon btn-secondary"><i className="fas fa-image"></i></button>
                                 <div className="flex-1">
@@ -989,10 +1050,13 @@ export default function ChatApp() {
                                         disabled={uploading} 
                                     />
                                 </div>
-                                <button onClick={editingMessage ? () => editMessage(editingMessage.id, newMessage) : sendMessage} className="btn btn-primary" disabled={(!newMessage.trim() && !selectedImage) || uploading}>
+                                <button 
+                                    onClick={editingMessage ? () => editMessage(editingMessage.id, newMessage) : sendMessage} 
+                                    className="btn btn-primary" 
+                                    disabled={(!newMessage.trim() && !selectedImage && !selectedGifUrl) || uploading}> 
+                                    
                                     {uploading ? (<div className="loading-spinner"></div>) : editingMessage ? (<i className="fas fa-save"></i>) : (<i className="fas fa-paper-plane"></i>)}
                                 </button>
-
                                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="file-input" />
                             </div>
                         ) : (
@@ -1012,6 +1076,7 @@ export default function ChatApp() {
                     </div>
                 )}
             </footer>
+
             {showScrollButton && (
                 <button onClick={scrollToBottom} className={`scroll-to-bottom fixed right-10 bottom-36 z-49 ${unseenMessages > 0 ? 'new-message animate-pulse' : ''}`}>
                     <i className="fas fa-arrow-down"></i>
