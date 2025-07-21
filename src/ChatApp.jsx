@@ -704,7 +704,7 @@ export default function ChatApp() {
                     if (Number(totalMessages) > lastMessageCountRef.current) {
                         const newMessagesCount = Number(totalMessages) - lastMessageCountRef.current;
                         const container = messagesContainerRef.current;
-                        const isAtBottom = container ? (container.scrollHeight - container.scrollTop - container.clientHeight) < 15 : true;
+                        const isAtBottom = container ? (container.scrollHeight - container.scrollTop - container.clientHeight) < container.clientHeight : true;
                         await loadNewerMessages(contract);
                         if (isAtBottom) {
                             setTimeout(() => scrollToBottom(), 300);
