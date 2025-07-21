@@ -337,7 +337,7 @@ export default function ChatApp() {
 
     const handleScroll = (e) => {
         const { scrollTop, scrollHeight, clientHeight } = e.target;
-        const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 10;
+        const isAtBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < clientHeight;
         setShowScrollButton(!isAtBottom);
 
         if (isAtBottom) {
